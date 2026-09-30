@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import '../index.css';
 import { socket, authenticateSocket } from '../socket';
+import { getBackendUrl } from '../config';
 
 interface RoomInfo {
   id: string;
@@ -15,6 +16,25 @@ const Lobby: React.FC = () => {
   const [rooms, setRooms] = useState<RoomInfo[]>([]);
   const navigate = useNavigate();
   const [username, setUsername] = useState<string>('Guest');
+  const [userBalance, setUserBalance] = useState<number | null>(null);
+
+  const fetchBalance = async () => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
+      const res = await fetch(`${getBackendUrl()}/api/wallet/balance`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUserBalance(Number(data.balance));
+      }
+    } catch (err) {
+      console.error('Fetch balance error:', err);
+    }
+  };
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -27,6 +47,7 @@ const Lobby: React.FC = () => {
 
     const user = authenticateSocket();
     setUsername(user.username);
+    fetchBalance();
 
     socket.emit('lobby:get_rooms');
 
@@ -89,7 +110,7 @@ const Lobby: React.FC = () => {
           <div>
             <h2 style={{ color: 'var(--primary-color)', margin: 0, fontSize: '1.6rem' }}>{username}</h2>
             <div style={{ color: '#ffd700', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px', marginTop: '4px' }}>
-              💰 10,000 Xu
+              💰 {userBalance !== null ? userBalance.toLocaleString() : '10,000'} Xu
             </div>
           </div>
         </div>
