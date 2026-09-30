@@ -122,11 +122,11 @@ export const GameEffects: React.FC<GameEffectsProps> = ({ effect, onEffectEnd })
     const particleCount = type === 'CHOP' ? 80 : type === 'FOUR_OF_KIND' ? 60 : 40;
     const particles: any[] = [];
 
-    const colors = type === 'CHOP' 
-      ? ['#ff2a4b', '#ff7700', '#ffd700', '#ffffff'] 
+    const colors = type === 'CHOP'
+      ? ['#ff2a4b', '#ff7700', '#ffd700', '#ffffff']
       : type === 'FOUR_OF_KIND'
-      ? ['#2ecc71', '#3498db', '#f1c40f', '#ffffff']
-      : ['#ffd700', '#f39c12', '#ffffff', '#e74c3c'];
+        ? ['#2ecc71', '#3498db', '#f1c40f', '#ffffff']
+        : ['#ffd700', '#f39c12', '#ffffff', '#e74c3c'];
 
     for (let i = 0; i < particleCount; i++) {
       const angle = Math.random() * Math.PI * 2;

@@ -901,27 +901,41 @@ const GameTable: React.FC = () => {
             const isSelected = selectedIndexes.includes(i);
             const total = myCards.length;
             const mid = (total - 1) / 2;
-            const angle = (i - mid) * 4; // Góc xòe quạt
-            const yCurve = Math.abs(i - mid) * 2.5; // Đường cong quạt
+            const angle = (i - mid) * 3; // Góc xòe quạt nhẹ
+            const yCurve = Math.abs(i - mid) * 2;
+
+            // Spacing gap xung quanh nhóm lá bài được chọn
+            const isPrevSelected = i > 0 && selectedIndexes.includes(i - 1);
+            let extraMarginLeft = 0;
+            if (i > 0) {
+              if (isSelected && !isPrevSelected) {
+                extraMarginLeft = 12; // Khoảng cách bên trái nhóm bài chọn
+              } else if (!isSelected && isPrevSelected) {
+                extraMarginLeft = 12; // Khoảng cách bên phải nhóm bài chọn
+              }
+            }
 
             return (
-              <div key={i + '-' + c.value + c.suit} className={`hand-card-wrapper ${isPlayable && turn === 0 ? 'is-playable' : 'is-disabled'}`} style={{ 
-                position: 'relative',
-                marginLeft: i === 0 ? '0' : 'var(--card-overlap)',
-                zIndex: isSelected ? 100 : i,
-                transform: isSelected 
-                  ? `translateY(-40px) scale(1.1) rotate(0deg)` 
-                  : `translateY(${yCurve}px) rotate(${angle}deg)`,
-                transformOrigin: 'bottom center',
-                transition: 'all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1)'
-              }}>
+              <div 
+                key={i + '-' + c.value + c.suit} 
+                className={`hand-card-wrapper ${isPlayable && turn === 0 ? 'is-playable' : ''} ${isDisabled ? 'is-disabled' : ''} ${isSelected ? 'is-selected' : ''}`} 
+                style={{ 
+                  position: 'relative',
+                  marginLeft: i === 0 ? '0' : `calc(var(--card-overlap) + ${extraMarginLeft}px)`,
+                  zIndex: i, // Thứ tự z-index tự nhiên: lá bên phải luôn đè lên lá bên trái
+                  transform: isSelected 
+                    ? `translateY(-24px) rotate(0deg)` 
+                    : `translateY(${yCurve}px) rotate(${angle}deg)`,
+                  transformOrigin: 'bottom center',
+                  transition: 'transform 0.22s ease-out, margin-left 0.22s ease-out, filter 0.22s ease-out'
+                }}
+              >
                 <CardUI 
                   value={c.value} 
                   suit={c.suit} 
                   isSelected={isSelected}
                   isDisabled={isDisabled}
                   onClick={() => toggleSelect(i)}
-                  style={{ boxShadow: isSelected ? '0 15px 35px rgba(0,0,0,0.6)' : '2px 5px 15px rgba(0,0,0,0.3)' }}
                 />
               </div>
             );

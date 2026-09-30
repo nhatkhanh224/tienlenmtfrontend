@@ -187,17 +187,18 @@
 /* States */
 .playing-card:hover {
   transform: translateY(-8px);
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.25);
 }
 
 .playing-card.state-selected {
-  transform: translateY(-24px) scale(1.04);
-  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.35), 0 0 20px var(--selected-glow);
+  transform: translateY(-24px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.35), 0 0 18px rgba(255, 215, 0, 0.5);
+  filter: brightness(1.15);
   border-radius: 12px;
 }
 .playing-card.state-selected .card-front {
-  border: 2.5px solid var(--selected-border);
-  box-shadow: inset 0 0 12px rgba(52, 152, 219, 0.3);
+  border: 3px solid #ffd700;
+  box-shadow: inset 0 0 12px rgba(255, 215, 0, 0.35);
 }
 
 /* Disabled State - Premium Dark Frosted Overlay & Lock Badge */
@@ -257,8 +258,8 @@
 }
 
 .hand-card-wrapper.is-playable .playing-card:not(.state-selected):hover {
-  transform: translateY(-16px) scale(1.04);
-  box-shadow: 0 14px 26px rgba(0, 0, 0, 0.45), 0 0 22px rgba(46, 213, 115, 0.75);
+  transform: translateY(-12px);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.4), 0 0 16px rgba(46, 213, 115, 0.6);
 }
 
 .playing-card.state-played {
@@ -344,6 +345,3 @@
   flex-shrink: 0;
 }
 
-.hand-card-wrapper:hover {
-  z-index: 150 !important;
-}
