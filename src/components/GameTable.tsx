@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useLocation } from 'react-router-dom';
 import CardUI from './CardUI';
 import '../index.css';
 import { Card, Suit } from '../game-engine/card';
@@ -12,10 +12,12 @@ const GameTable: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
   const isOfflineMode = !roomId || roomId === 'offline';
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [userId, setUserId] = useState<string>('');
   const userIdRef = useRef<string>('');
   const [username, setUsername] = useState<string>('Guest');
+  const [showCopyToast, setShowCopyToast] = useState<boolean>(false);
 
   // Trạng thái chung
   const [hands, setHands] = useState<{ [key: number]: Card[] }>({ 0: [], 1: [], 2: [], 3: [] });
@@ -175,13 +177,43 @@ const GameTable: React.FC = () => {
   // Room online state
   const [roomState, setRoomState] = useState<any>(null);
 
-  // Authenticate socket user
+  // Check auth & authenticate socket user
   useEffect(() => {
+    if (isOfflineMode) return;
+
+    const token = localStorage.getItem('token');
+    const storedUsername = localStorage.getItem('username');
+
+    if (!token || !storedUsername) {
+      // Lưu lại URL sòng bài để sau khi login tự động điều hướng trở lại bàn
+      sessionStorage.setItem('redirectAfterLogin', location.pathname);
+      navigate('/login');
+      return;
+    }
+
     const user = authenticateSocket();
     setUserId(user.userId);
     userIdRef.current = user.userId;
     setUsername(user.username);
-  }, []);
+  }, [isOfflineMode, location.pathname, navigate]);
+
+  const handleCopyRoomLink = () => {
+    const shareUrl = window.location.href;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(shareUrl);
+    } else {
+      const textArea = document.createElement('textarea');
+      textArea.value = shareUrl;
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand('copy');
+      document.body.removeChild(textArea);
+    }
+    setShowCopyToast(true);
+    setTimeout(() => {
+      setShowCopyToast(false);
+    }, 3000);
+  };
 
   // --- ONLINE SOCKET.IO LOGIC ---
   useEffect(() => {
@@ -619,11 +651,37 @@ const GameTable: React.FC = () => {
       {/* Visual Combo Effects Overlay */}
       <GameEffects effect={activeEffect} />
       
+      {/* Toast Notification khi sao chép link */}
+      {showCopyToast && (
+        <div className="animate-pop-in" style={{
+          position: 'absolute', top: '70px', left: '50%', transform: 'translateX(-50%)',
+          zIndex: 200, background: 'linear-gradient(135deg, #10b981, #059669)', color: 'white',
+          padding: '10px 24px', borderRadius: '30px', fontWeight: 'bold', fontSize: '0.95rem',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.4)', border: '1.5px solid rgba(255,255,255,0.4)'
+        }}>
+          📋 Đã sao chép link sòng! Gửi cho bạn bè để tự động vào bàn chơi.
+        </div>
+      )}
+
       {/* Header buttons */}
-      <div style={{ position: 'absolute', top: 20, left: 20, zIndex: 10 }}>
+      <div style={{ position: 'absolute', top: 20, left: 20, zIndex: 10, display: 'flex', gap: '10px' }}>
         <button className="btn btn-secondary" onClick={handleLeaveRoom} style={{ padding: '8px 16px', fontSize: '1rem' }}>
           ⬅ Thoát Sảnh
         </button>
+        {!isOfflineMode && (
+          <button 
+            className="btn" 
+            onClick={handleCopyRoomLink} 
+            style={{ 
+              padding: '8px 16px', fontSize: '0.92rem', fontWeight: 'bold',
+              background: 'linear-gradient(45deg, #f59e0b, #d97706)', 
+              color: 'white', border: 'none', borderRadius: '10px',
+              boxShadow: '0 4px 12px rgba(245, 158, 11, 0.4)'
+            }}
+          >
+            🔗 SAO CHÉP LINK SÒNG
+          </button>
+        )}
       </div>
       
       <div style={{ position: 'absolute', top: 20, right: 20, zIndex: 10, background: 'rgba(0,0,0,0.5)', padding: '5px 15px', borderRadius: '20px', color: 'white' }}>

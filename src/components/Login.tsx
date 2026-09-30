@@ -72,7 +72,13 @@ const Login: React.FC = () => {
           // Authenticate Socket.io connection
           authenticateSocket();
 
-          navigate('/lobby');
+          const redirectUrl = sessionStorage.getItem('redirectAfterLogin');
+          if (redirectUrl) {
+            sessionStorage.removeItem('redirectAfterLogin');
+            navigate(redirectUrl);
+          } else {
+            navigate('/lobby');
+          }
         }
       } catch (err: any) {
         setErrorMessage('Không thể kết nối đến máy chủ Backend!');
