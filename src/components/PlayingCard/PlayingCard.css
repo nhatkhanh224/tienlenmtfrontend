@@ -1,0 +1,349 @@
+:root {
+  --color-spades: #1a1a24;
+  --color-clubs: #1a1a24;
+  --color-diamonds: #e83151;
+  --color-hearts: #e83151;
+  
+  --card-bg: #ffffff;
+  --card-back-bg: #2b2b36;
+  --card-back-pattern: #3c3c4a;
+  
+  --heo-accent: #ffd700;
+  --heo-glow: rgba(255, 215, 0, 0.6);
+  
+  --selected-glow: rgba(52, 152, 219, 0.7);
+  --selected-border: #3498db;
+  
+  --combo-pair: #9b59b6;
+  --combo-straight: #2ecc71;
+  --combo-dragon: #f1c40f;
+
+  --card-width: 140px;
+  --card-height: 196px;
+  --card-overlap: -85px;
+}
+
+.playing-card {
+  width: var(--card-width);
+  height: var(--card-height);
+  border-radius: 12px;
+  background-color: var(--card-bg);
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2), 0 1px 3px rgba(0, 0, 0, 0.1);
+  position: relative;
+  user-select: none;
+  cursor: pointer;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.25s ease, filter 0.25s ease, opacity 0.25s ease;
+  font-family: 'Inter', 'Roboto', 'Segoe UI', sans-serif;
+  box-sizing: border-box;
+  display: inline-block;
+  transform-origin: bottom center;
+}
+
+/* Base Card Styles */
+.card-front, .card-back {
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+  position: absolute;
+  top: 0;
+  left: 0;
+  backface-visibility: hidden;
+  box-sizing: border-box;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.card-front {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 8px;
+}
+
+.card-back {
+  background-color: var(--card-back-bg);
+  padding: 8px;
+  border: 2px solid white;
+}
+
+.card-back-pattern {
+  width: 100%;
+  height: 100%;
+  border-radius: 6px;
+  border: 2px solid var(--card-back-pattern);
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 10px,
+    rgba(255, 255, 255, 0.05) 10px,
+    rgba(255, 255, 255, 0.05) 20px
+  );
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card-back-logo {
+  color: var(--card-back-pattern);
+}
+
+/* Corners */
+.card-corner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  line-height: 1;
+}
+
+.corner-rank {
+  font-size: 20px;
+  font-weight: 800;
+  letter-spacing: -1px;
+  margin-bottom: -2px;
+}
+
+.top-left {
+  align-self: flex-start;
+}
+
+.bottom-right {
+  align-self: flex-end;
+  transform: rotate(180deg);
+}
+
+/* Center Content */
+.card-center {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.center-number {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.center-rank-text {
+  font-size: 80px;
+  font-weight: 900;
+  line-height: 0.8;
+  opacity: 0.1;
+  position: absolute;
+}
+
+.center-suit-icon {
+  position: relative;
+  z-index: 1;
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.1));
+}
+
+.center-a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.15));
+}
+
+.center-face {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.face-icon {
+  opacity: 0.9;
+  position: relative;
+  z-index: 1;
+}
+
+.face-rank-bg {
+  font-size: 100px;
+  font-weight: 900;
+  position: absolute;
+  opacity: 0.08;
+  z-index: 0;
+}
+
+/* Special styling for 2 (Heo) */
+.card-heo .card-front {
+  border: 2px solid var(--heo-accent);
+  background: linear-gradient(135deg, #ffffff 0%, #fffcf0 100%);
+}
+
+.card-heo .center-rank-text {
+  opacity: 0.15;
+  color: var(--heo-accent);
+}
+
+.card-heo .corner-rank {
+  text-shadow: 0 1px 2px var(--heo-glow);
+}
+
+/* States */
+.playing-card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.25);
+}
+
+.playing-card.state-selected {
+  transform: translateY(-24px) scale(1.04);
+  box-shadow: 0 14px 28px rgba(0, 0, 0, 0.35), 0 0 20px var(--selected-glow);
+  border-radius: 12px;
+}
+.playing-card.state-selected .card-front {
+  border: 2.5px solid var(--selected-border);
+  box-shadow: inset 0 0 12px rgba(52, 152, 219, 0.3);
+}
+
+/* Disabled State - Premium Dark Frosted Overlay & Lock Badge */
+.playing-card.state-disabled {
+  opacity: 0.58;
+  filter: brightness(0.68) saturate(0.4) contrast(0.95);
+  transform: translateY(8px) scale(0.95);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  cursor: not-allowed !important;
+  pointer-events: none;
+  position: relative;
+  overflow: hidden;
+}
+
+.playing-card.state-disabled .card-front {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.playing-card.state-disabled::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.35) 0%, rgba(15, 23, 42, 0.75) 100%);
+  z-index: 10;
+  pointer-events: none;
+}
+
+.playing-card.state-disabled::after {
+  content: '';
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 20px;
+  height: 20px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23ffffff'%3E%3Cpath d='M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z'/%3E%3C/svg%3E");
+  background-size: contain;
+  background-repeat: no-repeat;
+  z-index: 11;
+  opacity: 0.75;
+  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8));
+}
+
+.playing-card.state-disabled:hover {
+  transform: translateY(8px) scale(0.95);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+}
+
+/* Playable Card Highlights */
+.hand-card-wrapper.is-playable .playing-card:not(.state-selected) {
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35), 0 0 14px rgba(46, 213, 115, 0.45);
+  border-radius: 12px;
+}
+
+.hand-card-wrapper.is-playable .playing-card:not(.state-selected) .card-front {
+  border: 1.5px solid rgba(46, 213, 115, 0.6);
+}
+
+.hand-card-wrapper.is-playable .playing-card:not(.state-selected):hover {
+  transform: translateY(-16px) scale(1.04);
+  box-shadow: 0 14px 26px rgba(0, 0, 0, 0.45), 0 0 22px rgba(46, 213, 115, 0.75);
+}
+
+.playing-card.state-played {
+  animation: playCard 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+  pointer-events: none;
+}
+
+@keyframes playCard {
+  0% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: translateY(-40px) scale(1.1);
+  }
+  100% {
+    transform: translateY(-20px) scale(0.9);
+    opacity: 0.9;
+  }
+}
+
+/* Combos */
+.playing-card.combo-pair .card-front {
+  box-shadow: inset 0 0 0 2px var(--combo-pair);
+}
+
+.playing-card.combo-straight .card-front {
+  box-shadow: inset 0 0 0 2px var(--combo-straight);
+}
+
+.playing-card.combo-dragon .card-front {
+  box-shadow: inset 0 0 0 3px var(--combo-dragon), 0 0 20px var(--combo-dragon);
+  animation: dragonGlow 2s infinite alternate;
+}
+
+@keyframes dragonGlow {
+  0% { box-shadow: inset 0 0 0 3px var(--combo-dragon), 0 0 10px rgba(241, 196, 15, 0.5); }
+  100% { box-shadow: inset 0 0 0 3px var(--combo-dragon), 0 0 25px rgba(241, 196, 15, 0.9); }
+}
+
+/* Adjustments for smaller screens (Mobile & Tablet) */
+@media (max-width: 1200px) {
+  :root {
+    --card-width: 115px;
+    --card-height: 160px;
+    --card-overlap: -70px;
+  }
+}
+
+@media (max-width: 900px) {
+  :root {
+    --card-width: 90px;
+    --card-height: 126px;
+    --card-overlap: -54px;
+  }
+  .corner-rank { font-size: 15px; }
+  .center-rank-text { font-size: 50px; }
+  .face-rank-bg { font-size: 65px; }
+}
+
+@media (max-width: 600px) {
+  :root {
+    --card-width: 72px;
+    --card-height: 100px;
+    --card-overlap: -44px;
+  }
+  .corner-rank { font-size: 12px; }
+  .center-rank-text { font-size: 36px; }
+  .face-rank-bg { font-size: 45px; }
+}
+
+@media (max-width: 420px) {
+  :root {
+    --card-width: 60px;
+    --card-height: 84px;
+    --card-overlap: -36px;
+  }
+  .corner-rank { font-size: 10px; }
+  .center-rank-text { font-size: 28px; }
+}
+
+.hand-card-wrapper {
+  flex-shrink: 0;
+}
+
+.hand-card-wrapper:hover {
+  z-index: 150 !important;
+}
