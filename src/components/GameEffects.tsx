@@ -144,7 +144,6 @@ export const GameEffects: React.FC<GameEffectsProps> = ({ effect, onEffectEnd })
       });
     }
 
-    let animationFrameId: number;
     const render = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       let aliveCount = 0;
@@ -171,7 +170,7 @@ export const GameEffects: React.FC<GameEffectsProps> = ({ effect, onEffectEnd })
       });
 
       if (aliveCount > 0) {
-        animationFrameId = requestAnimationFrame(render);
+        requestAnimationFrame(render);
       }
     };
 

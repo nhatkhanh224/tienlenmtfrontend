@@ -45,18 +45,8 @@ const Lobby: React.FC = () => {
       return;
     }
 
-    const user = authenticateSocket();
-    setUsername(user.username);
-    fetchBalance();
-
-    socket.emit('lobby:get_rooms');
-
     const handleRoomsUpdate = (data: RoomInfo[]) => {
       setRooms(data);
-    };
-
-    const handleRoomCreated = (data: { roomId: string }) => {
-      navigate(`/game/${data.roomId}`);
     };
 
     const handleError = (msg: string) => {
@@ -64,12 +54,21 @@ const Lobby: React.FC = () => {
     };
 
     socket.on('lobby:rooms', handleRoomsUpdate);
-    socket.on('room:created', handleRoomCreated);
     socket.on('error', handleError);
+
+    void authenticateSocket()
+      .then((user) => {
+        setUsername(user.username);
+        fetchBalance();
+        socket.emit('lobby:get_rooms');
+      })
+      .catch((error: Error) => {
+        alert(`Lỗi: ${error.message}`);
+        navigate('/login');
+      });
 
     return () => {
       socket.off('lobby:rooms', handleRoomsUpdate);
-      socket.off('room:created', handleRoomCreated);
       socket.off('error', handleError);
     };
   }, [navigate]);
@@ -82,12 +81,31 @@ const Lobby: React.FC = () => {
   };
 
   const handleCreateRoom = () => {
-    socket.emit('room:create', { bet: 1000 });
+    socket.timeout(8000).emit('room:create', { bet: 1000 }, (timeoutError: Error | null, response: { ok: boolean; roomId?: string; error?: string }) => {
+      if (timeoutError) {
+        alert('Lỗi: Máy chủ không phản hồi yêu cầu tạo bàn.');
+        return;
+      }
+      if (response?.ok && response.roomId) {
+        navigate(`/game/${response.roomId}`);
+      } else {
+        alert(`Lỗi: ${response?.error || 'Không thể tạo bàn.'}`);
+      }
+    });
   };
 
   const handleJoinRoom = (roomId: string) => {
-    socket.emit('room:join', { roomId });
-    navigate(`/game/${roomId}`);
+    socket.timeout(8000).emit('room:join', { roomId }, (timeoutError: Error | null, response: { ok: boolean; error?: string }) => {
+      if (timeoutError) {
+        alert('Lỗi: Máy chủ không phản hồi yêu cầu vào bàn.');
+        return;
+      }
+      if (response?.ok) {
+        navigate(`/game/${roomId}`);
+      } else {
+        alert(`Lỗi: ${response?.error || 'Không thể vào bàn.'}`);
+      }
+    });
   };
 
   const handlePlayOffline = () => {
@@ -110,7 +128,7 @@ const Lobby: React.FC = () => {
           <div>
             <h2 style={{ color: 'var(--primary-color)', margin: 0, fontSize: '1.6rem' }}>{username}</h2>
             <div style={{ color: '#ffd700', fontWeight: 'bold', display: 'flex', alignItems: 'center', gap: '5px', marginTop: '4px' }}>
-              💰 {userBalance !== null ? userBalance.toLocaleString() : '10,000'} Xu
+              💰 {userBalance !== null ? userBalance.toLocaleString() : 'Đang tải...'} Xu
             </div>
           </div>
         </div>

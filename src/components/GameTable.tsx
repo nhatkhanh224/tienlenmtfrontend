@@ -8,6 +8,25 @@ import { BotAI } from '../game-engine/bot';
 import { socket, authenticateSocket, getUserId } from '../socket';
 import { GameEffects, type ComboEffectData } from './GameEffects';
 
+const DEAL_CARD_INTERVAL_MS = 64;
+const DEAL_FINISH_BUFFER_MS = 420;
+
+const getDealTarget = (playerIndex: number, playerCount: number, roundIndex: number) => {
+  const horizontalSpread = (roundIndex - 6) * 1.75;
+  const verticalSpread = (roundIndex - 6) * 0.82;
+
+  if (playerIndex === 0) {
+    return { x: `calc(0vw + ${horizontalSpread}px)`, y: '33vh', rotate: `${horizontalSpread * 0.42}deg` };
+  }
+  if (playerCount === 2 || (playerCount === 4 && playerIndex === 2)) {
+    return { x: `calc(0vw + ${horizontalSpread}px)`, y: '-33vh', rotate: `${180 + horizontalSpread * 0.35}deg` };
+  }
+  if (playerIndex === 1) {
+    return { x: '-39vw', y: `calc(-6vh + ${verticalSpread}px)`, rotate: `${-90 + verticalSpread * 0.5}deg` };
+  }
+  return { x: '39vw', y: `calc(-6vh + ${verticalSpread}px)`, rotate: `${90 - verticalSpread * 0.5}deg` };
+};
+
 const GameTable: React.FC = () => {
   const { roomId } = useParams<{ roomId: string }>();
   const isOfflineMode = !roomId || roomId === 'offline';
@@ -16,6 +35,7 @@ const GameTable: React.FC = () => {
 
   const [userId, setUserId] = useState<string>('');
   const userIdRef = useRef<string>('');
+  const joinedRoomRef = useRef<boolean>(false);
   const [username, setUsername] = useState<string>('Guest');
   const [showCopyToast, setShowCopyToast] = useState<boolean>(false);
 
@@ -28,6 +48,11 @@ const GameTable: React.FC = () => {
   
   const [turn, setTurn] = useState<number>(-1);
   const [isDealing, setIsDealing] = useState<boolean>(false);
+  const [dealtCardCount, setDealtCardCount] = useState<number>(0);
+  const [dealStartCardCount, setDealStartCardCount] = useState<number>(0);
+  const [dealingPlayerCount, setDealingPlayerCount] = useState<number>(4);
+  const isDealingRef = useRef<boolean>(false);
+  const offlineStartingTurnRef = useRef<number | null>(null);
   const [lastPlayedTurn, setLastPlayedTurn] = useState<number>(0);
   const [messages, setMessages] = useState<{ [key: number]: string }>({});
   const [passedPlayers, setPassedPlayers] = useState<number[]>([]);
@@ -35,6 +60,7 @@ const GameTable: React.FC = () => {
   const [isFirstGame, setIsFirstGame] = useState<boolean>(true);
   const [isFirstMove, setIsFirstMove] = useState<boolean>(true);
   const [penaltyResults, setPenaltyResults] = useState<any[]>([]);
+  const [isResultModalDismissed, setIsResultModalDismissed] = useState<boolean>(false);
 
   // Visual Effects State
   const [activeEffect, setActiveEffect] = useState<ComboEffectData | null>(null);
@@ -44,6 +70,21 @@ const GameTable: React.FC = () => {
   const triggerScreenShake = () => {
     setIsShaking(true);
     setTimeout(() => setIsShaking(false), 550);
+  };
+
+  const beginDealAnimation = (rawPlayerCount: number, dealingEndsAt?: number | null) => {
+    const playerCount = Math.min(4, Math.max(2, rawPlayerCount));
+    const totalCards = playerCount * 13;
+    const totalDuration = totalCards * DEAL_CARD_INTERVAL_MS + DEAL_FINISH_BUFFER_MS;
+    const remainingDuration = dealingEndsAt ? Math.max(0, dealingEndsAt - Date.now()) : totalDuration;
+    const elapsedDuration = Math.max(0, totalDuration - remainingDuration);
+    const initialCardCount = Math.min(totalCards - 1, Math.floor(elapsedDuration / DEAL_CARD_INTERVAL_MS));
+
+    isDealingRef.current = true;
+    setDealingPlayerCount(playerCount);
+    setDealStartCardCount(initialCardCount);
+    setDealtCardCount(initialCardCount);
+    setIsDealing(true);
   };
 
   // Combo effect detector
@@ -174,10 +215,44 @@ const GameTable: React.FC = () => {
     prevCenterCardsRef.current = centerCards;
   }, [centerCards]);
 
+  useEffect(() => {
+    if (!isDealing) return;
+
+    const playerCount = Math.min(4, Math.max(2, dealingPlayerCount));
+    const totalCards = playerCount * 13;
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const dealInterval = reduceMotion ? 10 : DEAL_CARD_INTERVAL_MS;
+    let nextCard = Math.min(dealStartCardCount, totalCards - 1);
+    let finishTimer: number | undefined;
+
+    setDealtCardCount(nextCard);
+    const interval = window.setInterval(() => {
+      nextCard += 1;
+      setDealtCardCount(nextCard);
+
+      if (nextCard >= totalCards) {
+        window.clearInterval(interval);
+        finishTimer = window.setTimeout(() => {
+          if (isOfflineMode && offlineStartingTurnRef.current !== null) {
+            setTurn(offlineStartingTurnRef.current);
+            offlineStartingTurnRef.current = null;
+          }
+          isDealingRef.current = false;
+          setIsDealing(false);
+        }, reduceMotion ? 20 : DEAL_FINISH_BUFFER_MS);
+      }
+    }, dealInterval);
+
+    return () => {
+      window.clearInterval(interval);
+      if (finishTimer !== undefined) window.clearTimeout(finishTimer);
+    };
+  }, [isDealing, dealingPlayerCount, dealStartCardCount, isOfflineMode]);
+
   // Room online state
   const [roomState, setRoomState] = useState<any>(null);
 
-  // Check auth & authenticate socket user
+  // Check auth before setting up the online room connection.
   useEffect(() => {
     if (isOfflineMode) return;
 
@@ -191,10 +266,6 @@ const GameTable: React.FC = () => {
       return;
     }
 
-    const user = authenticateSocket();
-    setUserId(user.userId);
-    userIdRef.current = user.userId;
-    setUsername(user.username);
   }, [isOfflineMode, location.pathname, navigate]);
 
   const handleCopyRoomLink = () => {
@@ -219,7 +290,7 @@ const GameTable: React.FC = () => {
   useEffect(() => {
     if (isOfflineMode) return;
 
-    socket.emit('room:join', { roomId });
+    let cancelled = false;
 
     const handleRoomUpdate = (data: any) => {
       setRoomState(data);
@@ -231,15 +302,17 @@ const GameTable: React.FC = () => {
     const handleGameStarted = (data: any) => {
       setRoomState(data);
       updateStateFromPublicRoom(data);
-      setIsDealing(true);
-      setTimeout(() => {
-        setIsDealing(false);
-      }, 1500);
+      setIsResultModalDismissed(false);
+      offlineStartingTurnRef.current = null;
+      beginDealAnimation(data.players?.length || 2, data.dealingEndsAt);
     };
 
     const handleGameUpdate = (data: any) => {
       setRoomState(data);
       updateStateFromPublicRoom(data);
+      if (data.isDealing && !isDealingRef.current) {
+        beginDealAnimation(data.players?.length || 2, data.dealingEndsAt);
+      }
     };
 
     const handleError = (msg: string) => {
@@ -247,6 +320,7 @@ const GameTable: React.FC = () => {
     };
 
     const handleRoomCancelled = (data: { roomId: string; reason?: string }) => {
+      joinedRoomRef.current = false;
       alert(data.reason || 'Bàn đã bị hủy!');
       navigate('/lobby');
     };
@@ -257,7 +331,47 @@ const GameTable: React.FC = () => {
     socket.on('room:cancelled', handleRoomCancelled);
     socket.on('error', handleError);
 
+    // Socket.IO loses server-side room membership after a reconnect. Always
+    // authenticate and rejoin here so room actions and broadcasts keep working.
+    const connectToRoom = async () => {
+      try {
+        const user = await authenticateSocket();
+        if (cancelled) return;
+        setUserId(user.userId);
+        userIdRef.current = user.userId;
+        setUsername(user.username);
+
+        socket.timeout(8000).emit('room:join', { roomId }, (timeoutError: Error | null, response: { ok: boolean; error?: string }) => {
+          if (cancelled) return;
+          if (timeoutError) {
+            alert('Lỗi: Máy chủ không phản hồi yêu cầu vào bàn.');
+            navigate('/lobby');
+            return;
+          }
+          if (response?.ok) {
+            joinedRoomRef.current = true;
+            return;
+          }
+          alert(`Lỗi: ${response?.error || 'Không thể vào bàn.'}`);
+          navigate('/lobby');
+        });
+      } catch (error) {
+        if (cancelled) return;
+        alert(`Lỗi: ${error instanceof Error ? error.message : 'Không thể xác thực kết nối.'}`);
+        navigate('/login');
+      }
+    };
+
+    socket.on('connect', connectToRoom);
+    if (socket.connected) void connectToRoom();
+
     return () => {
+      cancelled = true;
+      if (joinedRoomRef.current && roomId) {
+        socket.emit('room:leave', { roomId });
+        joinedRoomRef.current = false;
+      }
+      socket.off('connect', connectToRoom);
       socket.off('room:update', handleRoomUpdate);
       socket.off('game:started', handleGameStarted);
       socket.off('game:update', handleGameUpdate);
@@ -346,7 +460,9 @@ const GameTable: React.FC = () => {
   };
 
   const shuffleAndDealOffline = () => {
-    setIsDealing(true);
+    setIsResultModalDismissed(false);
+    offlineStartingTurnRef.current = null;
+    beginDealAnimation(4);
     setTurn(-1);
     const deck = createDeck();
     const newHands = {
@@ -385,10 +501,7 @@ const GameTable: React.FC = () => {
     setMessages({});
     setPenaltyResults([]);
     
-    setTimeout(() => {
-      setIsDealing(false);
-      setTurn(startingPlayer);
-    }, 1500);
+    offlineStartingTurnRef.current = startingPlayer;
   };
 
   useEffect(() => {
@@ -406,9 +519,18 @@ const GameTable: React.FC = () => {
   const isNewRound = centerCards.length === 0;
   const centerCombo = centerCards.length > 0 ? Validator.getCombo(centerCards) : null;
   const myCards = hands[0] || [];
+  const isGamePlaying = isOfflineMode
+    ? turn !== -1 && !isDealing
+    : roomState?.status === 'PLAYING' && !isDealing && !roomState?.isDealing;
+  const isGameFinished = isOfflineMode
+    ? !isFirstGame && turn === -1 && !isDealing
+    : roomState?.status === 'FINISHED';
+  const isSettling = !isOfflineMode && !!roomState?.isSettling;
   
   // Dùng Validator.getPlayableIndices chuẩn xác!
-  const playableIndices = Validator.getPlayableIndices(myCards, isNewRound ? null : centerCombo, isFirstMove);
+  const playableIndices = isGamePlaying
+    ? Validator.getPlayableIndices(myCards, isNewRound ? null : centerCombo, isFirstMove)
+    : [];
 
   useEffect(() => {
     if (turn === 0) {
@@ -417,7 +539,7 @@ const GameTable: React.FC = () => {
   }, [turn, centerCards.length]);
 
   const toggleSelect = (idx: number) => {
-    if (turn !== 0 || !playableIndices.includes(idx)) return;
+    if (!isGamePlaying || turn !== 0 || !playableIndices.includes(idx)) return;
     if (selectedIndexes.includes(idx)) {
       setSelectedIndexes(selectedIndexes.filter(i => i !== idx));
     } else {
@@ -437,18 +559,29 @@ const GameTable: React.FC = () => {
   };
 
   // Turn management for Offline Bot AI
-  const advanceTurnOffline = (currentTurn: number, isPass: boolean, currentHandCount: number) => {
+  const advanceTurnOffline = (currentTurn: number, isPass: boolean, currentHand: Card[]) => {
     const updatedRanks = { ...ranks };
-    if (currentHandCount === 0 && !updatedRanks[currentTurn]) {
-       const rank = Object.keys(updatedRanks).length + 1;
+    const getAvailableRank = (preferWorst = false) => {
+      const usedRanks = new Set(Object.values(updatedRanks));
+      const candidates = preferWorst ? [4, 3, 2, 1] : [1, 2, 3, 4];
+      return candidates.find(rank => !usedRanks.has(rank)) || 4;
+    };
+
+    if (currentHand.length === 0 && !updatedRanks[currentTurn]) {
+       const rank = getAvailableRank();
        updatedRanks[currentTurn] = rank;
        setRanks(updatedRanks);
        showMessage(currentTurn, `Về hạng ${rank}! 🏆`);
+    } else if (currentHand.length === 1 && currentHand[0].value === 15 && !updatedRanks[currentTurn]) {
+       const rank = getAvailableRank(true);
+       updatedRanks[currentTurn] = rank;
+       setRanks(updatedRanks);
+       showMessage(currentTurn, `Thối Heo! Về hạng ${rank}`);
     }
 
     if (Object.keys(updatedRanks).length >= 3) {
        const loser = [0,1,2,3].find(p => !updatedRanks[p]);
-       if (loser !== undefined) updatedRanks[loser] = 4;
+       if (loser !== undefined) updatedRanks[loser] = getAvailableRank();
        setRanks(updatedRanks);
        setIsFirstGame(false);
        setTurn(-1);
@@ -489,7 +622,7 @@ const GameTable: React.FC = () => {
       const timer = setTimeout(() => {
         let isPass = false;
         let playedCards: Card[] = [];
-        let newHandCount = hands[turn as keyof typeof hands].length;
+        let remainingHand = hands[turn as keyof typeof hands];
 
         playedCards = BotAI.getBestMove(hands[turn as keyof typeof hands], isNewRound ? null : centerCombo, isNewRound, isFirstMove);
 
@@ -505,19 +638,19 @@ const GameTable: React.FC = () => {
           const playedValues = playedCards.map(c => c.value + '-' + c.suit);
           const newHand = hands[turn as keyof typeof hands].filter(c => !playedValues.includes(c.value + '-' + c.suit));
           setHands(prev => ({ ...prev, [turn]: newHand }));
-          newHandCount = newHand.length;
+          remainingHand = newHand;
 
           if (playedCards.length < 4) showMessage(turn, "Chặt!");
         }
 
-        advanceTurnOffline(turn, isPass, newHandCount);
+        advanceTurnOffline(turn, isPass, remainingHand);
       }, 1200);
       return () => clearTimeout(timer);
     }
   }, [turn, centerCards, passedPlayers, isOfflineMode]);
 
   const handlePlay = () => {
-    if (selectedIndexes.length === 0 || turn !== 0) return;
+    if (!isGamePlaying || selectedIndexes.length === 0 || turn !== 0) return;
     
     const playedCards = selectedIndexes.map(i => myCards[i]);
     const combo = Validator.getCombo(playedCards);
@@ -525,6 +658,11 @@ const GameTable: React.FC = () => {
     if (combo.type === ComboType.INVALID) {
       alert("Bộ bài không hợp lệ theo luật Tiến Lên!");
       setSelectedIndexes([]);
+      return;
+    }
+
+    if (Validator.wouldFinishWithPig(myCards, playedCards)) {
+      alert("Không được đánh Heo (2) để về cuối!");
       return;
     }
 
@@ -562,12 +700,12 @@ const GameTable: React.FC = () => {
       setHands(prev => ({ ...prev, 0: newHand }));
       setSelectedIndexes([]);
       setLastPlayedTurn(0);
-      advanceTurnOffline(0, false, newHand.length);
+      advanceTurnOffline(0, false, newHand);
     }
   };
 
   const handlePass = () => {
-    if (turn !== 0) return;
+    if (!isGamePlaying || turn !== 0) return;
     if (isNewRound) {
       alert("Bạn là người mở vòng mới, không được bỏ lượt!");
       return;
@@ -581,27 +719,47 @@ const GameTable: React.FC = () => {
       // OFFLINE PASS
       setSelectedIndexes([]);
       showMessage(0, "Bỏ lượt");
-      advanceTurnOffline(0, true, myCards.length);
+      advanceTurnOffline(0, true, myCards);
     }
   };
 
   const handleStartOnlineGame = () => {
-    socket.emit('room:start', { roomId });
+    socket.timeout(8000).emit('room:start', { roomId }, (timeoutError: Error | null, response: { ok: boolean; error?: string }) => {
+      if (timeoutError) {
+        alert('Lỗi: Máy chủ không phản hồi yêu cầu bắt đầu game.');
+      } else if (!response?.ok) {
+        alert(`Lỗi: ${response?.error || 'Không thể bắt đầu game.'}`);
+      }
+    });
   };
 
   const handleAddBot = () => {
-    socket.emit('room:add_bot', { roomId });
+    socket.timeout(8000).emit('room:add_bot', { roomId }, (timeoutError: Error | null, response: { ok: boolean; error?: string }) => {
+      if (timeoutError) {
+        alert('Lỗi: Máy chủ không phản hồi yêu cầu thêm Bot.');
+      } else if (!response?.ok) {
+        alert(`Lỗi: ${response?.error || 'Không thể thêm Bot.'}`);
+      }
+    });
   };
 
   const handleLeaveRoom = () => {
     if (!isOfflineMode && roomId) {
-      socket.emit('room:leave', { roomId });
+      joinedRoomRef.current = false;
+      socket.timeout(3000).emit('room:leave', { roomId }, (timeoutError: Error | null) => {
+        if (timeoutError) {
+          // Buộc server nhận sự kiện disconnect để dọn phòng nếu gói leave bị mất.
+          socket.disconnect();
+          socket.connect();
+        }
+        navigate('/lobby');
+      });
+      return;
     }
     navigate('/lobby');
   };
 
   const PlayerAvatar = ({ name, playerIdx, position, isActive = false }: any) => {
-    const cardCount = hands[playerIdx]?.length || 0;
     const rank = ranks[playerIdx];
     const rankIcons: any = { 1: '🥇', 2: '🥈', 3: '🥉', 4: '💩' };
     const playerInfo = playersInfo[playerIdx];
@@ -634,9 +792,6 @@ const GameTable: React.FC = () => {
         </div>
         <div style={{ background: 'rgba(0,0,0,0.6)', padding: '2px 8px', borderRadius: '10px', fontSize: '0.9rem', color: 'white' }}>
           {name || `Người chơi ${playerIdx + 1}`}
-        </div>
-        <div style={{ color: '#ffd700', fontSize: '0.8rem', fontWeight: 'bold' }}>
-          {cardCount} lá
         </div>
       </div>
     );
@@ -692,7 +847,7 @@ const GameTable: React.FC = () => {
       {isRoomWaiting && (
         <div className="glass-panel animate-pop-in" style={{
           position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-          padding: '25px 20px', borderRadius: '20px', zIndex: 100, textAlign: 'center', width: '92%', maxWidth: '450px',
+          padding: '25px 20px', borderRadius: '20px', zIndex: 300, textAlign: 'center', width: '92%', maxWidth: '450px',
           background: 'rgba(0,0,0,0.92)', border: '2px solid var(--secondary-color)', boxSizing: 'border-box'
         }}>
           <h2 style={{ color: 'var(--secondary-color)', marginBottom: '15px' }}>PHÒNG CHỜ ONLINE (#{roomId})</h2>
@@ -824,25 +979,102 @@ const GameTable: React.FC = () => {
         )}
       </div>
       
-      {turn === -1 && isDealing && (
-        <div className="glass-panel animate-pop-in" style={{
-          position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(0,0,0,0.85)', zIndex: 1000,
-          display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center'
-        }}>
-           <div className="animate-bounce" style={{ fontSize: '6rem', textShadow: '0 0 30px gold' }}>🃏</div>
-           <h2 style={{ color: 'white', marginTop: '30px', letterSpacing: '4px', fontSize: '2rem' }}>ĐANG XÀO VÀ CHIA BÀI...</h2>
-        </div>
-      )}
+      {isDealing && (() => {
+        const playerCount = Math.min(4, Math.max(2, dealingPlayerCount));
+        const totalDealCards = playerCount * 13;
+        return (
+          <div className="dealing-overlay">
+            <div className="dealing-table-glow" />
+            <div className="dealing-ambient" aria-hidden="true">
+              <span>♠</span><span>♥</span><span>♣</span><span>♦</span>
+            </div>
+            <div className="dealing-heading">
+              <span>TIẾN LÊN MIỀN TRUNG</span>
+              <strong>CHIA BÀI</strong>
+            </div>
 
-      {turn === -1 && !isDealing && !isRoomWaiting && (
+            {Array.from({ length: playerCount }, (_, playerIndex) => {
+              const target = getDealTarget(playerIndex, playerCount, 6);
+              const targetStyle = {
+                '--deal-x': target.x,
+                '--deal-y': target.y
+              } as React.CSSProperties;
+              return (
+                <div key={`seat-${playerIndex}`} className="dealing-seat-target" style={targetStyle}>
+                  <i />
+                  <span>{playerIndex === 0 ? 'BẠN' : (playersInfo[playerIndex]?.username || `NGƯỜI CHƠI ${playerIndex + 1}`)}</span>
+                </div>
+              );
+            })}
+
+            <div className="dealing-deck" aria-hidden="true">
+              <div className="dealing-card-back" />
+              <span>{Math.max(0, totalDealCards - dealtCardCount)}</span>
+            </div>
+
+            {Array.from({ length: dealtCardCount }, (_, cardIndex) => {
+              const playerIndex = cardIndex % playerCount;
+              const roundIndex = Math.floor(cardIndex / playerCount);
+              const target = getDealTarget(playerIndex, playerCount, roundIndex);
+              const cardStyle = {
+                '--deal-x': target.x,
+                '--deal-y': target.y,
+                '--deal-rotate': target.rotate,
+                zIndex: 1010 + cardIndex
+              } as React.CSSProperties;
+
+              return (
+                <div key={`deal-${cardIndex}`} className="dealing-flying-card" style={cardStyle} aria-hidden="true">
+                  <div className="dealing-card-back" />
+                </div>
+              );
+            })}
+
+            <div className="dealing-status" role="status" aria-live="polite">
+              <div className="dealing-status-row">
+                <strong>ĐANG PHÁT BÀI</strong>
+                <span>{Math.min(dealtCardCount, totalDealCards)}/{totalDealCards} lá</span>
+              </div>
+              <div className="dealing-progress-track">
+                <div style={{ width: `${Math.min(100, (dealtCardCount / totalDealCards) * 100)}%` }} />
+              </div>
+              <small>Ván đấu sẽ bắt đầu sau khi chia đủ bài</small>
+            </div>
+          </div>
+        );
+      })()}
+
+      {isGameFinished && !isResultModalDismissed && (
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 300,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          padding: '5vh 4vw', background: 'rgba(0,0,0,0.28)'
+        }}>
         <div className="animate-pop-in" style={{
-          position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-          background: 'rgba(0,0,0,0.94)', padding: '20px 18px', borderRadius: '15px', textAlign: 'center', zIndex: 100,
-          border: '2px solid gold', width: '92%', maxWidth: '480px', maxHeight: '90vh', overflowY: 'auto',
+          position: 'relative', background: 'rgba(0,0,0,0.94)', padding: '20px 18px', borderRadius: '15px', textAlign: 'center',
+          border: '2px solid gold', width: '100%', maxWidth: '480px', maxHeight: '90vh', overflowY: 'auto',
           boxShadow: '0 0 30px rgba(255,215,0,0.4)', boxSizing: 'border-box'
         }}>
+          <button
+            type="button"
+            aria-label="Đóng bảng kết quả"
+            onClick={() => setIsResultModalDismissed(true)}
+            style={{
+              position: 'absolute', top: '10px', right: '10px', width: '34px', height: '34px',
+              borderRadius: '50%', border: '1px solid rgba(255,255,255,0.35)',
+              background: 'rgba(255,255,255,0.12)', color: 'white', cursor: 'pointer',
+              fontSize: '1.1rem', fontWeight: 'bold', lineHeight: 1
+            }}
+          >
+            ✕
+          </button>
           <h2 style={{ color: 'gold', marginBottom: '20px', fontSize: '2rem' }}>🏆 VÁN BÀI KẾT THÚC! 🏆</h2>
+
+          {isSettling && (
+            <div style={{ color: '#5ce1e6', marginBottom: '18px', fontWeight: 'bold' }}>
+              ⏳ Đang tổng kết và cập nhật tiền cược...
+            </div>
+          )}
           
           {penaltyResults.length > 0 && (
             <div style={{ marginBottom: '20px', textAlign: 'left', background: 'rgba(255,255,255,0.08)', padding: '16px 20px', borderRadius: '12px', border: '1px solid rgba(255,215,0,0.3)' }}>
@@ -878,7 +1110,7 @@ const GameTable: React.FC = () => {
             </div>
           )}
 
-          {(!isOfflineMode && !isHost) ? (
+          {!isSettling && ((!isOfflineMode && !isHost) ? (
             <div style={{ color: 'gold', fontStyle: 'italic', fontSize: '1.1rem', marginTop: '15px' }}>
               Đang chờ chủ phòng bắt đầu ván mới...
             </div>
@@ -886,8 +1118,20 @@ const GameTable: React.FC = () => {
             <button className="btn" onClick={() => isOfflineMode ? shuffleAndDealOffline() : handleStartOnlineGame()} style={{ fontSize: '1.2rem', padding: '12px 35px', marginTop: '10px', background: 'linear-gradient(45deg, #10b981, #059669)' }}>
               {isOfflineMode ? 'Chơi Lại Ván Mới' : 'Bắt Đầu Ván Mới (Online)'}
             </button>
-          )}
+          ))}
         </div>
+        </div>
+      )}
+
+      {isGameFinished && isResultModalDismissed && (
+        <button
+          type="button"
+          className="btn btn-secondary"
+          onClick={() => setIsResultModalDismissed(false)}
+          style={{ position: 'fixed', top: '70px', right: '20px', zIndex: 300, padding: '9px 16px', fontSize: '0.9rem' }}
+        >
+          📊 Xem kết quả
+        </button>
       )}
 
       {turn !== -1 && !isDealing && !isRoomWaiting && (
@@ -903,10 +1147,11 @@ const GameTable: React.FC = () => {
       {/* Khung điều khiển & bài trên tay của người chơi */}
       <div style={{
         position: 'absolute', bottom: '15px', left: '50%', transform: 'translateX(-50%)',
-        display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', zIndex: 100
+        display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', zIndex: 100,
+        pointerEvents: isGamePlaying ? 'auto' : 'none'
       }}>
         
-        {!isRoomWaiting && (
+        {isGamePlaying && (
           <div style={{ 
             display: 'flex', gap: '20px', marginBottom: '45px', 
             opacity: turn === 0 ? 1 : 0.4, 

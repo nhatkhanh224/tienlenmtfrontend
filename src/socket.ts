@@ -7,25 +7,45 @@ export const socket: Socket = io(getBackendUrl(), {
 });
 
 export function getUserId(): string {
-  let userId = sessionStorage.getItem('userId');
-  if (!userId) {
-    userId = 'user_' + Math.random().toString(36).substring(2, 9);
-    sessionStorage.setItem('userId', userId);
-  }
-  return userId;
+  return sessionStorage.getItem('userId') || '';
 }
 
 export function getUsername(): string {
   return localStorage.getItem('username') || 'Player_' + getUserId().slice(-4);
 }
 
-export function authenticateSocket() {
-  const userId = getUserId();
+interface SocketAuthResponse {
+  ok: boolean;
+  userId?: string;
+  username?: string;
+  error?: string;
+}
+
+export async function authenticateSocket(): Promise<{ userId: string; username: string }> {
+  const token = localStorage.getItem('token');
   const username = getUsername();
-  socket.emit('auth', { userId, username });
-  return { userId, username };
+  if (!token) return { userId: '', username };
+
+  return new Promise((resolve, reject) => {
+    socket.timeout(8000).emit('auth', { token }, (timeoutError: Error | null, response: SocketAuthResponse) => {
+      if (timeoutError) {
+        reject(new Error('Không thể xác thực kết nối tới máy chủ.'));
+        return;
+      }
+      if (!response?.ok || !response.userId || !response.username) {
+        reject(new Error(response?.error || 'Phiên đăng nhập không hợp lệ.'));
+        return;
+      }
+
+      sessionStorage.setItem('userId', response.userId);
+      localStorage.setItem('username', response.username);
+      resolve({ userId: response.userId, username: response.username });
+    });
+  });
 }
 
 socket.on('connect', () => {
-  authenticateSocket();
+  if (localStorage.getItem('token')) {
+    void authenticateSocket().catch((error) => console.error('Socket authentication error:', error));
+  }
 });

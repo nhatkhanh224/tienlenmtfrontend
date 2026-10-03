@@ -108,6 +108,324 @@ body {
   animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
 }
 
+/* Hoạt cảnh phát đủ 13 lá cho từng ghế */
+.dealing-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 46%, rgba(155, 135, 245, 0.26), transparent 33%),
+    radial-gradient(circle at 18% 18%, rgba(102, 217, 232, 0.14), transparent 30%),
+    radial-gradient(circle at 82% 82%, rgba(246, 202, 104, 0.11), transparent 28%),
+    linear-gradient(145deg, rgba(28, 24, 48, 0.97), rgba(18, 16, 31, 0.98));
+  backdrop-filter: blur(5px);
+  isolation: isolate;
+}
+
+.dealing-overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  opacity: 0.22;
+  background-image:
+    linear-gradient(rgba(155, 135, 245, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(102, 217, 232, 0.06) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(circle at center, black, transparent 76%);
+}
+
+.dealing-table-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: min(76vw, 860px);
+  height: min(59vh, 520px);
+  transform: translate(-50%, -50%);
+  border: 1px solid rgba(155, 135, 245, 0.42);
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(41, 35, 63, 0.66), rgba(25, 22, 38, 0.36) 66%, transparent 68%);
+  box-shadow:
+    inset 0 0 100px rgba(102, 217, 232, 0.07),
+    0 0 0 8px rgba(155, 135, 245, 0.025),
+    0 0 90px rgba(102, 217, 232, 0.08);
+}
+
+.dealing-table-glow::after {
+  content: '';
+  position: absolute;
+  inset: 8%;
+  border: 1px dashed rgba(246, 202, 104, 0.2);
+  border-radius: inherit;
+  animation: dealingOrbit 18s linear infinite;
+}
+
+.dealing-heading {
+  position: absolute;
+  top: clamp(18px, 4vh, 42px);
+  left: 50%;
+  z-index: 1100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  transform: translateX(-50%);
+  text-align: center;
+}
+
+.dealing-heading span {
+  color: #aeeef5;
+  font-size: clamp(0.58rem, 1.4vw, 0.72rem);
+  font-weight: 800;
+  letter-spacing: 0.24em;
+  opacity: 0.86;
+}
+
+.dealing-heading strong {
+  color: #f8d57e;
+  font-size: clamp(1.35rem, 4vw, 2.15rem);
+  font-weight: 950;
+  letter-spacing: 0.16em;
+  text-shadow: 0 0 24px rgba(246, 202, 104, 0.4);
+}
+
+.dealing-ambient span {
+  position: absolute;
+  z-index: -1;
+  color: rgba(155, 135, 245, 0.09);
+  font-size: clamp(7rem, 20vw, 17rem);
+  line-height: 1;
+  filter: blur(0.2px);
+  animation: dealingFloat 6s ease-in-out infinite alternate;
+}
+
+.dealing-ambient span:nth-child(1) { top: -3%; left: 3%; }
+.dealing-ambient span:nth-child(2) { top: 4%; right: 2%; color: rgba(246, 202, 104, 0.075); animation-delay: -2s; }
+.dealing-ambient span:nth-child(3) { bottom: -8%; left: 4%; color: rgba(102, 217, 232, 0.07); animation-delay: -4s; }
+.dealing-ambient span:nth-child(4) { right: 3%; bottom: -10%; animation-delay: -1s; }
+
+.dealing-seat-target {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 1002;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  width: 136px;
+  pointer-events: none;
+  transform: translate(-50%, -50%) translate(var(--deal-x), var(--deal-y));
+}
+
+.dealing-seat-target i {
+  width: 62px;
+  height: 14px;
+  border: 1px solid rgba(102, 217, 232, 0.48);
+  border-radius: 50%;
+  background: rgba(102, 217, 232, 0.08);
+  box-shadow: 0 0 22px rgba(102, 217, 232, 0.28);
+  animation: dealingSeatPulse 1.15s ease-in-out infinite alternate;
+}
+
+.dealing-seat-target span {
+  max-width: 136px;
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-overflow: ellipsis;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.7);
+  white-space: nowrap;
+}
+
+.dealing-card-back {
+  position: relative;
+  width: 62px;
+  height: 89px;
+  overflow: hidden;
+  border: 3px solid #f8f2ff;
+  border-radius: 10px;
+  background:
+    radial-gradient(circle at center, rgba(102, 217, 232, 0.3), transparent 34%),
+    repeating-linear-gradient(45deg, rgba(255,255,255,0.06) 0 2px, transparent 2px 7px),
+    linear-gradient(145deg, #7967dc, #40347c 55%, #262044);
+  box-shadow:
+    0 12px 28px rgba(4, 2, 14, 0.5),
+    inset 0 0 0 2px rgba(246, 202, 104, 0.46),
+    inset 0 0 24px rgba(102, 217, 232, 0.12);
+}
+
+.dealing-card-back::before {
+  content: '♠';
+  position: absolute;
+  inset: 9px;
+  display: grid;
+  place-items: center;
+  color: #f6ca68;
+  font-size: 1.75rem;
+  border: 1px solid rgba(246, 202, 104, 0.55);
+  border-radius: 6px;
+  text-shadow: 0 0 14px rgba(246, 202, 104, 0.42);
+}
+
+.dealing-card-back::after {
+  content: 'TL';
+  position: absolute;
+  left: 50%;
+  bottom: 10px;
+  color: #b9f4fa;
+  font-size: 0.5rem;
+  font-weight: 950;
+  letter-spacing: 0.16em;
+  transform: translateX(-50%);
+}
+
+.dealing-deck {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  z-index: 1005;
+  filter: drop-shadow(0 0 24px rgba(155, 135, 245, 0.3));
+  transform: translate(-50%, -50%) rotate(-4deg) scale(1.05);
+}
+
+.dealing-deck::before,
+.dealing-deck::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border: 2px solid #eee8ff;
+  border-radius: 10px;
+  background: #40347c;
+}
+
+.dealing-deck::before { transform: translate(-5px, 4px) rotate(-3deg); }
+.dealing-deck::after { transform: translate(-9px, 7px) rotate(-5deg); }
+
+.dealing-deck > span {
+  position: absolute;
+  top: -14px;
+  right: -16px;
+  display: grid;
+  place-items: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  color: #241d3a;
+  font-size: 0.75rem;
+  font-weight: 900;
+  background: #f6ca68;
+  border: 2px solid white;
+  border-radius: 999px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+}
+
+.dealing-flying-card {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 62px;
+  height: 89px;
+  pointer-events: none;
+  will-change: transform, opacity;
+  filter: drop-shadow(0 7px 8px rgba(5, 3, 16, 0.36));
+  animation: dealCardToSeat 0.42s cubic-bezier(0.18, 0.78, 0.22, 1) both;
+}
+
+.dealing-status {
+  position: absolute;
+  left: 50%;
+  bottom: clamp(16px, 3.5vh, 38px);
+  z-index: 1100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: min(390px, 84vw);
+  padding: 12px 16px 11px;
+  transform: translateX(-50%);
+  color: white;
+  text-align: center;
+  text-shadow: 0 2px 8px rgba(0,0,0,0.65);
+  background: linear-gradient(135deg, rgba(41, 35, 63, 0.84), rgba(25, 22, 38, 0.9));
+  border: 1px solid rgba(155, 135, 245, 0.4);
+  border-radius: 15px;
+  box-shadow: 0 16px 38px rgba(5, 3, 15, 0.32), inset 0 1px rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(10px);
+}
+
+.dealing-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.dealing-status strong {
+  color: #f8d57e;
+  font-size: 0.84rem;
+  letter-spacing: 0.15em;
+}
+
+.dealing-status span { color: #b9f4fa; font-size: 0.78rem; font-weight: 800; }
+.dealing-status small { font-size: 0.68rem; opacity: 0.62; }
+
+.dealing-progress-track {
+  width: 100%;
+  height: 7px;
+  overflow: hidden;
+  background: rgba(255,255,255,0.13);
+  border-radius: 999px;
+}
+
+.dealing-progress-track > div {
+  height: 100%;
+  background: linear-gradient(90deg, #9b87f5, #66d9e8 62%, #f6ca68);
+  border-radius: inherit;
+  box-shadow: 0 0 14px rgba(102, 217, 232, 0.46);
+  transition: width 0.08s linear;
+}
+
+@keyframes dealCardToSeat {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) translate(0, 0) rotate(0deg) scale(1.14);
+  }
+  18% { opacity: 1; }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -50%) translate(var(--deal-x), var(--deal-y)) rotate(var(--deal-rotate)) scale(0.88);
+  }
+}
+
+@keyframes dealingOrbit { to { transform: rotate(360deg); } }
+@keyframes dealingFloat { to { transform: translateY(18px) rotate(4deg); } }
+@keyframes dealingSeatPulse {
+  to { transform: scale(1.12); opacity: 0.58; box-shadow: 0 0 32px rgba(155, 135, 245, 0.38); }
+}
+
+@media (max-width: 600px) {
+  .dealing-card-back,
+  .dealing-flying-card { width: 52px; height: 75px; }
+  .dealing-table-glow { width: 90vw; height: 61vh; }
+  .dealing-seat-target { width: 92px; }
+  .dealing-seat-target span { max-width: 92px; font-size: 0.56rem; }
+  .dealing-seat-target i { width: 48px; }
+  .dealing-status { bottom: 12px; padding: 10px 13px; }
+  .dealing-heading { top: 14px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dealing-flying-card,
+  .dealing-table-glow::after,
+  .dealing-ambient span,
+  .dealing-seat-target i { animation-duration: 0.01ms; }
+}
+
 @keyframes flyFromBottom { 
   0% { transform: translate(0, 40vh) scale(0.3) rotateX(-60deg) rotate(0deg); opacity: 0; filter: blur(5px); }
   60% { transform: translate(0, -3vh) scale(1.15) rotateX(20deg) rotate(-5deg); opacity: 1; filter: blur(0); }

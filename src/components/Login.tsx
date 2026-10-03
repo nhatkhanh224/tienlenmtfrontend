@@ -70,7 +70,7 @@ const Login: React.FC = () => {
           sessionStorage.setItem('userId', data.userId);
 
           // Authenticate Socket.io connection
-          authenticateSocket();
+          await authenticateSocket();
 
           const redirectUrl = sessionStorage.getItem('redirectAfterLogin');
           if (redirectUrl) {

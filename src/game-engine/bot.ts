@@ -166,10 +166,11 @@ export class BotAI {
   static getBestMove(hand: Card[], centerCombo: Combo | null, isNewRound: boolean, isFirstMove: boolean = false): Card[] {
     const sortedHand = Validator.sortCards(hand);
     const extracted = this.extractCombos(sortedHand);
+    const isAllowedMove = (cards: Card[]) => !Validator.wouldFinishWithPig(sortedHand, cards);
     
     // Gom tất cả bộ đã phân rã vào 1 mảng để dễ tìm kiếm đè bài
     // Sắp xếp các combo theo giá trị của lá bài nhỏ nhất trong combo để ưu tiên đánh rác nhỏ trước
-    const allSortedCombos = extracted.allCombos.sort((a, b) => {
+    const allSortedCombos = extracted.allCombos.filter(isAllowedMove).sort((a, b) => {
         const aMin = Math.min(...a.map(c => c.value));
         const bMin = Math.min(...b.map(c => c.value));
         return aMin - bMin;
@@ -189,7 +190,8 @@ export class BotAI {
       const comboWithSmallest = allSortedCombos.find(combo => combo.some(c => c.value === smallestCard.value && c.suit === smallestCard.suit));
       if (comboWithSmallest) return comboWithSmallest;
       
-      return [smallestCard];
+      const fallbackMove = [smallestCard];
+      return isAllowedMove(fallbackMove) ? fallbackMove : [];
     }
 
     // --- LOGIC ĐỠ BÀI (DEFEND) ---
@@ -210,7 +212,7 @@ export class BotAI {
     // thử "xé" bài từ toàn bộ bài trên tay (vd: có đôi nhưng cần đánh lẻ để chặt/đè)
     if (centerCombo.type === ComboType.SINGLE) {
       // Xé rác
-      const validSingles = sortedHand.filter(c => c.isGreaterThan(centerCombo.highestCard));
+      const validSingles = sortedHand.filter(c => c.isGreaterThan(centerCombo.highestCard) && isAllowedMove([c]));
       if (validSingles.length > 0) {
         // Nếu lá đè là Heo (hoặc lá cao như A), hoặc mình sắp hết bài, xé đôi cũng đáng
         return [validSingles[0]];
@@ -233,7 +235,7 @@ export class BotAI {
         if (cards.length >= 2) {
           const candidatePair = [cards[0], cards[1]];
           const combo = Validator.getCombo(candidatePair);
-          if (Validator.canPlay(combo, centerCombo)) {
+          if (Validator.canPlay(combo, centerCombo) && isAllowedMove(candidatePair)) {
             validPairs.push(candidatePair);
           }
         }
